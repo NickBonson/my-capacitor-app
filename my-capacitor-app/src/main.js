@@ -2,6 +2,8 @@ import './style.css'
 import javascriptLogo from './javascript.svg'
 import viteLogo from '/vite.svg'
 import { setupCounter } from './counter.js'
+import { Capacitor } from '@capacitor/core'
+import { NativePasskey } from '@joyid/capacitor-native-passkey'
 
 document.querySelector('#app').innerHTML = `
   <div>
@@ -41,6 +43,41 @@ function base64ToArrayBuffer(base64) {
   }
   return buf.buffer;
 }
+
+async function registerNativePasskey() {
+  const challenge = arrayBufferToBase64(getRandomBuffer(32));
+  const userId = arrayBufferToBase64(getRandomBuffer(32));
+  try {
+    const { credentialId } = await NativePasskey.register({
+      challenge,
+      userId,
+      userName: 'user@example.com',
+      displayName: 'User Example'
+    });
+    localStorage.setItem('passkeyId', credentialId);
+    alert('Native passkey registered!');
+  } catch (err) {
+    console.error(err);
+    alert('Native registration failed: ' + err);
+  }
+}
+
+async function loginNativePasskey() {
+  const credentialId = localStorage.getItem('passkeyId');
+  if (!credentialId) {
+    alert('No passkey registered');
+    return;
+  }
+  const challenge = arrayBufferToBase64(getRandomBuffer(32));
+  try {
+    await NativePasskey.authenticate({ challenge, credentialId });
+    alert('Native authentication succeeded!');
+  } catch (err) {
+    console.error(err);
+    alert('Native authentication failed: ' + err);
+  }
+}
+
 
 async function registerPasskey() {
   if (!window.PublicKeyCredential) {
@@ -100,9 +137,14 @@ async function loginPasskey() {
   } catch (err) {
     console.error(err);
     alert('Authentication failed: ' + err);
-  }
+}
 }
 
 setupCounter(document.querySelector('#counter'))
-document.getElementById('register').addEventListener('click', registerPasskey)
-document.getElementById('login').addEventListener('click', loginPasskey)
+if (Capacitor.getPlatform() === 'android') {
+  document.getElementById('register').addEventListener('click', registerNativePasskey)
+  document.getElementById('login').addEventListener('click', loginNativePasskey)
+} else {
+  document.getElementById('register').addEventListener('click', registerPasskey)
+  document.getElementById('login').addEventListener('click', loginPasskey)
+}
